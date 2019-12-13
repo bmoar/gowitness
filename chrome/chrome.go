@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"time"
@@ -19,10 +18,12 @@ import (
 // Chrome contains information about a Google Chrome
 // instance, with methods to run on it.
 type Chrome struct {
-	Resolution    string
-	ChromeTimeout int
-	Path          string
-	UserAgent     string
+	Resolution       string
+	ChromeTimeout    int
+	ChromeTimeBudget int
+	Path             string
+	UserAgent        string
+	Argvs            []string
 
 	ScreenshotPath string
 }
@@ -125,11 +126,6 @@ func (chrome *Chrome) checkVersion(lowestVersion string) bool {
 // SetScreenshotPath sets the path for screenshots
 func (chrome *Chrome) SetScreenshotPath(p string) error {
 
-	p, err := filepath.Abs(p)
-	if err != nil {
-		return err
-	}
-
 	if _, err := os.Stat(p); os.IsNotExist(err) {
 		return errors.New("Destination path does not exist")
 	}
@@ -152,7 +148,17 @@ func (chrome *Chrome) ScreenshotURL(targetURL *url.URL, destination string) {
 		"--disable-crash-reporter",
 		"--user-agent=" + chrome.UserAgent,
 		"--window-size=" + chrome.Resolution, "--screenshot=" + destination,
+		"--virtual-time-budget=" + strconv.Itoa(chrome.ChromeTimeBudget*1000),
 	}
+
+	// Append extra arguments
+	if len(chrome.Argvs) > 0 {
+		for _, a := range chrome.Argvs {
+			chromeArguments = append(chromeArguments, a)
+		}
+	}
+
+	log.Info(chromeArguments)
 
 	// When we are running as root, chromiun will flag the 'cant
 	// run as root' thing. Handle that case.
